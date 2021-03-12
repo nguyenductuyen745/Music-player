@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="#">
+    <link rel="stylesheet" href="./font/css/all.min.css">
+    <link rel="stylesheet" href="./responsive.css">
+    <link rel="stylesheet" href="./main.css">
+    <title>Music player</title>
+</head>
+<body>
+    <div class="app">
+        <div class="dashboard">
+            <header class="heading">
+                <span>Now playing:</span>
+                <h3></h3>
+            </header>
+            <div class="cd">
+                <div class="cd-thumb"></div>
+            </div>
+            <div class="control">
+                <i id="btn-loop" class="fas fa-redo-alt"></i>
+                <i class="fas fa-step-backward"></i>
+                <div class="control__play-button">
+                    <i class="fas fa-pause"></i>
+                    <i class="fas fa-play"></i>
+                </div>
+                <i class="fas fa-step-forward"></i>
+                <i id="btn-random" class="fas fa-random"></i>
+            </div>
+            <input type="range" class="progress" value="0" min="0" max="100">
+            <audio id="audio" src=""></audio>
+        </div>
+        <ul class="playlist">
+        </ul>
+    </div>
+    <script type="module">
+        const $ = document.querySelector.bind(document);
+        const $$ = document.querySelectorAll.bind(document);
+        const cd = $('.cd-thumb');
+        const audio = $('#audio');
+        const playlist = $('.playlist');
+        const range = $('.progress');
+
+        const app = {
+            isSeeking: false,
+            isPlaying: false,
+            isRepeat: false,
+            isRandom: false,
+            indexOfCurrentSong: 0,
+            hanleEvents: function() {
+                let duration = audio.duration;
+                const cdWidth = cd.offsetWidth;
+                const playBtn = $('.control__play-button');
+                const songsInThePlaylist = $$('.playlist > .song');
+                const loopBtn = $('#btn-loop');
+                const randomBtn = $('#btn-random');
+                const forwardBtn = $('.fa-step-forward');
+                const backwardBtn = $('.fa-step-backward');
+                
+                // Xử lý phóng to/ thu nhỏ CD
+                window.addEventListener('scroll', function(event) {
+                    const scrollTop = document.documentElement.scrollTop;
+
+                    Object.assign(cd.style, {
+                        width: cdWidth - (scrollTop <= cdWidth ? scrollTop : cdWidth) + 'px',
+                        opacity: 1 - (scrollTop / cdWidth)
+                    })
+                })
+                
+                // Xử lý khi click play/ pause
+                playBtn.addEventListener('click', function(event) {
+                    if(app.isPlaying) {
+                        audio.pause();
+                    } else {
+                        audio.play();
+                    }
+                })
+
+                audio.onplay = function() {
+                    playBtn.classList.add('playing');
+                    app.isPlaying = true;
+                    // Xoay ảnh
+                    cd.classList.add('playing');
+                    cd.style.animationPlayState = "running";
+                };
+
+                audio.onpause = function() {
+                    playBtn.classList.remove('playing');
+                    app.isPlaying = false;
+                    // Dừng xoay ảnh
+                    cd.style.animationPlayState = "paused";
+                };
+
+                // Xử lý run range
+                audio.addEventListener('timeupdate', function(event) {
+                    duration = event.target.duration;
+                    
+                    // không chạy slider-thumb khi user đang tời nhạc(kéo slider-thumb)
+                    if(app.isPlaying && app.isSeeking === false) {
+                        range.value = duration ? Math.round((event.target.currentTime / duration) * 100) : 0;
+                    }
+                })
+                
+                // Xử lý khi seeking range(tời nhạc)
+                range.addEventListener('input', function(event) {
+                    app.isSeeking = true;
+                })
+                
+                range.addEventListener('change', function(event) {
+                    app.isSeeking = false;
+                    duration = audio.duration;
+                    audio.currentTime = (duration / 100) * event.target.value;
+                })
+           
+                // Xử lý khi phát hết bài nhạc
+                audio.addEventListener('ended', function(event) {      
+                    // Ktra loop, random có đang đc active ko trước khi phát bài tiếp theo
+                    if(app.isRepeat === false) {
+                        if(app.isRandom) {
+                            app.random();
+                        } else {
+                            // Phát bài ngay sau
+                            app.indexOfCurrentSong++;
+                        }
+                    }         
+                    
+                    // Update lại data của bài tiếp theo nên và reset animation cho CD
+                    cd.classList.remove('playing');
+                    app.loadSong();
+                    audio.play();
+                })
+
+                // Xử lý replace song theo yêu cầu user (khi user click vào song ở playlist thì phát bài đó)
+                songsInThePlaylist.forEach((song) => {
+                    song.addEventListener('click', (event) => {
+                        app.indexOfCurrentSong = event.currentTarget.dataset['id'];
+                        app.loadSong();
+                        audio.play();
+                    })
+                });
+           
+                // Bắt sự kiện cho các nút loop, random
+                loopBtn.addEventListener('click', function(event) {
+                    event.target.classList.toggle('active');
+                    app.isRepeat = app.isRepeat ? false : true;
+                })
+
+                randomBtn.addEventListener('click', function(event) {
+                    event.target.classList.toggle('active');
+                    app.isRandom = app.isRandom ? false : true;
+                })
+
+                // Bắt sự kiên cho 2 nút next và previous
+                forwardBtn.addEventListener('click', (event) => {
+                    app.TransferSong(event.target, 'forw');
+                });
+                backwardBtn.addEventListener('click', (event) => {
+                    app.TransferSong(event.target, 'backw');
+                });
+            },
+            TransferSong: function(obj, direction) {
+                    obj.classList.add('clicked');
+                    // sau 0.4s tức là lúc hết animation của nút thì sẽ clear bỏ class để có thể click đc tiếp.
+                    setTimeout(()=>{obj.classList.remove('clicked')}, 400);
+                     
+                    // Kiểm tra xem nếu khi nhấn next or prev mà random đang đc active thì cần chuyển bài ngẫu nhiên
+                    if(this.isRandom) {
+                        this.random();
+                    } else {
+                        if(direction === 'forw') {
+                            this.indexOfCurrentSong < this.songs.length - 1 ? this.indexOfCurrentSong++ : this.indexOfCurrentSong = 0;
+                        } else if(direction === 'backw') {
+                            this.indexOfCurrentSong > 0 ? this.indexOfCurrentSong-- : this.indexOfCurrentSong = this.songs.length - 1;
+                        }
+                    }
+
+                    this.loadSong();
+                    audio.play();
+            },
+            random: function() {
+                let randomIndex = Math.floor(Math.random() * this.songs.length);
+                app.indexOfCurrentSong = randomIndex == app.indexOfCurrentSong ? --randomIndex : randomIndex;
+            },
+            render: function() {
+                let id = 0;
+                this.songs.forEach((song) => {
+                    playlist.insertAdjacentHTML('beforeend', `
+                    <li class="song" data-id="${id}">
+                        <div class="song__thumb">
+                            <img src="${song.image}" alt="">
+                        </div>
+                        <div class="song__body">
+                            <h3 class="body__song-name">${song.name}</h3>
+                            <span class="body__singer">${song.singer}</span>
+                        </div>
+                        <div class="song__option">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </div>
+                    </li>`);
+                    id++;
+                })
+            },
+            loadSong: function() {
+                const header = $('.heading > h3');
+                    // Nếu như chỉ mục của bài tiếp vượt quá or bằng length of arr songs(chúng tỏ đã phát tới last song) thì sẽ set lại = 0 để phát lại từ đầu playlist
+                const indexChecked = this.indexOfCurrentSong >= this.songs.length ? this.indexOfCurrentSong = 0 : this.indexOfCurrentSong;
+                const song = this.songs[indexChecked];
+
+                // set background-color màu cho bài đang đc phát ở d/s playlist 
+                playlist.querySelector('.song.active')?.classList.remove('active');
+                playlist.children[indexChecked].classList.add('active');
+
+                //
+                audio.src = song['path'];;
+                header.innerText = song['name'];
+                cd.style.backgroundImage = `url('${song['image']}')`;
+            },
+            start: function() {
+                // Tải danh sách cách bài hát
+                this.render();
+                
+                // Xử lý các hiệu ứng khi scroll
+                this.hanleEvents();
+
+                // Tải data của bài hát đầu tiên nên
+                this.loadSong();
+            }
+        }
+
+        // Gọi nên API để lấy data Songs xong rồi mới chạy code = cách gọi app.start();
+        fetch('https://5f9c17a7856f4c00168c6cee.mockapi.io/data-songs')
+            .then((value) => {
+                return value.json();
+            })
+            .then((songs) => {
+                app['songs'] = songs; // tạo thêm cho object app 1 key là songs và value của nó là data songs mà t vừa lấy đc từ API
+                app.start();
+            })
+    </script>
+</body>
+</html>
