@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="#">
+    <link rel="shortcut icon" href="./assets/images/logo.png">
     <link rel="stylesheet" href="./assets/font/css/all.min.css">
     <link rel="stylesheet" href="./assets/responsive.css">
     <link rel="stylesheet" href="./assets/main.css">
@@ -35,6 +35,15 @@
         </div>
         <ul class="playlist">
         </ul>
+        <div class="dark-mode-wrap">
+            <input type="checkbox" id="mycheck">
+            <label class="dark-mode-btn" for="mycheck">
+                <div class="dark-mode-btn__circle">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </div>
+            </label>
+        </div>
     </div>
     <script type="module">
         const $ = document.querySelector.bind(document);
@@ -159,6 +168,12 @@
                 });
                 backwardBtn.addEventListener('click', (event) => {
                     app.TransferSong(event.target, 'backw');
+                });
+
+                // Khi user click dark mode
+                $('#mycheck').addEventListener('change', (event) => {
+                    const appElement = $('.app');
+                    appElement.classList.toggle('dark-mode');
                 });
             },
             TransferSong: function(obj, direction) {
